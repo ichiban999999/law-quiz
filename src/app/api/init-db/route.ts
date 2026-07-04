@@ -1,167 +1,111 @@
 import { NextResponse } from 'next/server';
 import { initializeDatabase, seedSampleQuizzes, getAllLaws, saveLaw, clearLaws } from '@/db';
 
-// 法規定義 - 對應到 articles 頁面的分類
+// 法規定義 - 使用正確的 pcode 格式 (A 開頭)
 const lawDefinitions = [
   // 憲法類
-  { id: 'DL000001', name: '中華民國憲法', category: '憲法' },
-  { id: 'DL000002', name: '憲法增修條文', category: '憲法' },
-  { id: 'DL000003', name: '司法院大法官憲法解釋', category: '憲法' },
+  { id: 'A0000001', name: '中華民國憲法', category: '憲法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000001' },
+  { id: 'A0000002', name: '憲法增修條文', category: '憲法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000002' },
+  { id: 'A0000003', name: '司法院大法官憲法解釋', category: '憲法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000003' },
   
   // 民事法類
-  { id: 'DL000004', name: '民法', category: '民事法' },
-  { id: 'DL000005', name: '民事訴訟法', category: '民事法' },
-  { id: 'DL000006', name: '家事事件法', category: '民事法' },
-  { id: 'DL000007', name: '強制執行法', category: '民事法' },
-  { id: 'DL000008', name: '涉外民事法律適用法', category: '民事法' },
-  { id: 'DL000009', name: '非訟事件法', category: '民事法' },
-  { id: 'DL000010', name: '仲裁法', category: '民事法' },
+  { id: 'A0000004', name: '民法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000004' },
+  { id: 'A0000005', name: '民事訴訟法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000005' },
+  { id: 'A0000006', name: '家事事件法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000006' },
+  { id: 'A0000007', name: '強制執行法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000007' },
+  { id: 'A0000008', name: '涉外民事法律適用法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000008' },
+  { id: 'A0000009', name: '非訟事件法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000009' },
+  { id: 'A0000010', name: '仲裁法', category: '民事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000010' },
   
   // 刑事法類
-  { id: 'DL000012', name: '中華民國刑法', category: '刑事法' },
-  { id: 'DL000013', name: '刑事訴訟法', category: '刑事法' },
-  { id: 'DL000014', name: '刑事補償法', category: '刑事法' },
-  { id: 'DL000015', name: '性侵害犯罪防治法', category: '刑事法' },
+  { id: 'A0000012', name: '中華民國刑法', category: '刑事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000012' },
+  { id: 'A0000013', name: '刑事訴訟法', category: '刑事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000013' },
+  { id: 'A0000014', name: '刑事補償法', category: '刑事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000014' },
+  { id: 'A0000015', name: '性侵害犯罪防治法', category: '刑事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000015' },
   
   // 行政法類
-  { id: 'DL000016', name: '行政程序法', category: '行政法' },
-  { id: 'DL000017', name: '行政訴訟法', category: '行政法' },
-  { id: 'DL000018', name: '行政罰法', category: '行政法' },
-  { id: 'DL000019', name: '行政執行法', category: '行政法' },
-  { id: 'DL000020', name: '訴願法', category: '行政法' },
-  { id: 'DL000021', name: '國家賠償法', category: '行政法' },
-  { id: 'DL000022', name: '地方制度法', category: '行政法' },
+  { id: 'A0000016', name: '行政程序法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000016' },
+  { id: 'A0000017', name: '行政訴訟法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000017' },
+  { id: 'A0000018', name: '行政罰法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000018' },
+  { id: 'A0000019', name: '行政執行法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000019' },
+  { id: 'A0000020', name: '訴願法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000020' },
+  { id: 'A0000021', name: '國家賠償法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000021' },
+  { id: 'A0000022', name: '地方制度法', category: '行政法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000022' },
   
   // 商事法類
-  { id: 'DL000024', name: '公司法', category: '商事法' },
-  { id: 'DL000025', name: '保險法', category: '商事法' },
-  { id: 'DL000026', name: '票據法', category: '商事法' },
-  { id: 'DL000027', name: '證券交易法', category: '商事法' },
-  { id: 'DL000028', name: '海商法', category: '商事法' },
+  { id: 'A0000024', name: '公司法', category: '商事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000024' },
+  { id: 'A0000025', name: '保險法', category: '商事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000025' },
+  { id: 'A0000026', name: '票據法', category: '商事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000026' },
+  { id: 'A0000027', name: '證券交易法', category: '商事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000027' },
+  { id: 'A0000028', name: '海商法', category: '商事法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000028' },
   
   // 司法制度類
-  { id: 'DL000030', name: '法院組織法', category: '司法制度' },
-  { id: 'DL000031', name: '法官法', category: '司法制度' },
-  { id: 'DL000032', name: '律師法', category: '司法制度' },
+  { id: 'A0000030', name: '法院組織法', category: '司法制度', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000030' },
+  { id: 'A0000031', name: '法官法', category: '司法制度', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000031' },
+  { id: 'A0000032', name: '律師法', category: '司法制度', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000032' },
   
   // 勞動與社會法類
-  { id: 'DL000033', name: '勞動基準法', category: '勞動與社會法' },
-  { id: 'DL000034', name: '勞工保險條例', category: '勞動與社會法' },
-  { id: 'DL000035', name: '性別平等工作法', category: '勞動與社會法' },
-  { id: 'DL000036', name: '消費者保護法', category: '勞動與社會法' },
+  { id: 'A0000033', name: '勞動基準法', category: '勞動與社會法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000033' },
+  { id: 'A0000034', name: '勞工保險條例', category: '勞動與社會法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000034' },
+  { id: 'A0000035', name: '性別平等工作法', category: '勞動與社會法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000035' },
+  { id: 'A0000036', name: '消費者保護法', category: '勞動與社會法', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000036' },
   
   // 土地與不動產類
-  { id: 'DL000037', name: '土地法', category: '土地與不動產' },
-  { id: 'DL000038', name: '土地徵收條例', category: '土地與不動產' },
-  { id: 'DL000039', name: '都市計畫法', category: '土地與不動產' },
+  { id: 'A0000037', name: '土地法', category: '土地與不動產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000037' },
+  { id: 'A0000038', name: '土地徵收條例', category: '土地與不動產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000038' },
+  { id: 'A0000039', name: '都市計畫法', category: '土地與不動產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000039' },
   
   // 智慧財產類
-  { id: 'DL000040', name: '著作權法', category: '智慧財產' },
-  { id: 'DL000041', name: '商標法', category: '智慧財產' },
-  { id: 'DL000042', name: '專利法', category: '智慧財產' },
+  { id: 'A0000040', name: '著作權法', category: '智慧財產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000040' },
+  { id: 'A0000041', name: '商標法', category: '智慧財產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000041' },
+  { id: 'A0000042', name: '專利法', category: '智慧財產', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0000042' },
 ];
 
 /**
- * 解析政府 API 回傳的法規內容
- * 全國法規資料庫 API 回傳格式範例：
- * {
- *   "Data": {
- *     "LawDetail": {
- *       "LName": "法規名稱",
- *       "Items": [...],  // 條文
- *       "Chapters": [...] // 章名
- *     }
- *   }
- * }
+ * 從 HTML 頁面解析法規內容
  */
-function parseLawResponse(data: any): string {
-  if (!data || !data.Data) {
-    return '[無法解析的回傳格式]';
-  }
+function parseLawHTML(html: string): string {
+  // 提取法規名稱
+  const nameMatch = html.match(/<h2[^>]*>[^<]*<\/h2>/);
+  const lawName = nameMatch ? nameMatch[0].replace(/<[^>]+>/g, '') : '';
   
-  const lawDetail = data.Data.LawDetail || data.Data;
-  let content = '';
+  // 提取所有條文內容
+  const simpleArticleRegex = /class="law-article"[^>]*>([\s\S]*?)<\/div>/g;
+  let articles: string[] = [];
+  let match;
   
-  // 方法1: 嘗試從 Items (條文) 取得內容
-  if (lawDetail.Items && Array.isArray(lawDetail.Items)) {
-    const items = lawDetail.Items.map((item: any) => {
-      const itemNum = item.LName || item.ZHNM || item.No || '';
-      const itemContent = item.Content || item.NR || item.MContent || '';
-      return itemNum ? `第${itemNum}條 ${itemContent}` : itemContent;
-    });
-    if (items.length > 0) {
-      content = items.filter((i: string) => i).join('\n\n');
+  while ((match = simpleArticleRegex.exec(html)) !== null) {
+    let content = match[1];
+    // 移除 HTML 標籤
+    content = content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    if (content && content.length > 5) {
+      articles.push(content);
     }
   }
   
-  // 方法2: 嘗試從 Chapters (章節) 取得內容
-  if (!content && lawDetail.Chapters && Array.isArray(lawDetail.Chapters)) {
-    content = lawDetail.Chapters.map((ch: any) => {
-      const chName = ch.ZM || ch.Name || '';
-      const chArticles = ch.Items || ch.Articles || [];
-      const articles = chArticles.map((a: any) => 
-        `第${a.LName || a.No || ''}條 ${a.Content || a.NR || ''}`
-      ).filter(Boolean).join('\n');
-      return chName ? `【${chName}】\n${articles}` : articles;
-    }).join('\n\n');
+  if (articles.length > 0) {
+    return `【${lawName}】\n\n` + articles.join('\n\n');
   }
   
-  // 方法3: 嘗試從 LawArticle (條文列表) 取得內容
-  if (!content && lawDetail.LawArticle && Array.isArray(lawDetail.LawArticle)) {
-    content = lawDetail.LawArticle.map((a: any) => {
-      const no = a.ZHNM || a.No || a.ItemNo || '';
-      const text = a.NR || a.Content || a.Text || '';
-      return no ? `第${no}條 ${text}` : text;
-    }).filter(Boolean).join('\n\n');
-  }
-  
-  // 方法4: 嘗試從 Data 直接取得条文
-  if (!content && data.Data && typeof data.Data === 'object') {
-    for (const key of Object.keys(data.Data)) {
-      const val = (data.Data as any)[key];
-      if (Array.isArray(val) && val.length > 0 && val[0].NR || val[0].Content) {
-        content = val.map((item: any) => 
-          `第${item.LName || item.ZHNM || item.No || ''}條 ${item.NR || item.Content || item.Text || ''}`
-        ).filter(Boolean).join('\n\n');
-        break;
-      }
-    }
-  }
-  
-  // 方法5: 嘗試從 Data.Laws 取得
-  if (!content && data.Data.Laws && Array.isArray(data.Data.Laws)) {
-    content = data.Data.Laws.map((law: any) => {
-      const articles = law.Items || law.LawArticle || [];
-      return articles.map((a: any) => 
-        `第${a.LName || a.ZHNM || a.No || ''}條 ${a.Content || a.NR || a.Text || ''}`
-      ).filter(Boolean).join('\n');
-    }).join('\n\n');
-  }
-  
-  // 如果還是沒有內容，儲存原始 JSON 的前 5000 字元
-  if (!content) {
-    const rawJson = JSON.stringify(lawDetail, null, 2);
-    content = rawJson.length > 5000 ? rawJson.substring(0, 5000) + '...\n[內容過長，已截斷]' : rawJson;
-  }
-  
-  return content || '[暫無內容]';
+  return '[無法解析內容，請參考官方網站]';
 }
 
 async function fetchSingleLaw(lawDef: typeof lawDefinitions[0]): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const apiUrl = `https://law.moj.gov.tw/API/${lawDef.id}`;
-    console.log(`Fetching: ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
-      signal: AbortSignal.timeout(15000), // 15秒超時
+    const response = await fetch(lawDef.url, {
+      headers: {
+        'User-Agent': 'LawQuizApp/1.0',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(20000),
     });
     
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
     }
     
-    const data = await response.json();
-    const content = parseLawResponse(data);
+    const html = await response.text();
+    const content = parseLawHTML(html);
     
     return { success: true, content };
   } catch (error) {
@@ -174,7 +118,7 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
   
   // 如果不是強制同步且已有資料，跳過
   if (!forceSync && existingLaws.length > 0) {
-    return { synced: 0, skipped: existingLaws.length, message: '已有法規資料，跳過同步。使用 forceSync=true 可強制重新同步。' };
+    return { synced: 0, skipped: existingLaws.length, failed: 0, message: '已有法規資料，跳過同步。使用 force=true 可強制重新同步。' };
   }
   
   // 如果已有資料且強制同步，先清空
@@ -205,7 +149,7 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
         id: law.id,
         name: law.name,
         category: law.category,
-        content: `[同步失敗: ${result.error}] 請參考官方網站: https://law.moj.gov.tw/LAW/LawMobile.aspx?ID=${law.id}`,
+        content: `[同步失敗: ${result.error}] 請參考官方網站: ${law.url}`,
         updated_at: new Date().toISOString(),
       });
       failed++;
@@ -213,7 +157,7 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
     }
     
     // 避免請求太快，加個小延遲
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   
   return { synced, skipped, failed, message: `同步完成: ${synced} 成功, ${failed} 失敗` };
