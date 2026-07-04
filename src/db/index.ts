@@ -41,20 +41,10 @@ console.log('Using database path:', dbPath);
 
 // 初始化資料庫
 let db: any;
-try {
-  db = new Database(dbPath);
-} catch (error) {
-  console.error('Failed to initialize database:', error);
-  throw error;
-}
 
-// 啟用 WAL 模式以提高效能
-db.pragma('journal_mode = WAL');
-
-// 建立資料表
-export function initializeDatabase() {
+function createTables(dbInstance: any) {
   // 題庫資料表
-  db.exec(`
+  dbInstance.exec(`
     CREATE TABLE IF NOT EXISTS quizzes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       subject TEXT NOT NULL,
@@ -72,7 +62,7 @@ export function initializeDatabase() {
   `);
 
   // 使用者資料表
-  db.exec(`
+  dbInstance.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -83,7 +73,7 @@ export function initializeDatabase() {
   `);
 
   // 成績記錄資料表
-  db.exec(`
+  dbInstance.exec(`
     CREATE TABLE IF NOT EXISTS scores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -98,7 +88,7 @@ export function initializeDatabase() {
   `);
 
   // 錯題本資料表
-  db.exec(`
+  dbInstance.exec(`
     CREATE TABLE IF NOT EXISTS wrong_answers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -112,7 +102,7 @@ export function initializeDatabase() {
   `);
 
   // 法規資料表
-  db.exec(`
+  dbInstance.exec(`
     CREATE TABLE IF NOT EXISTS laws (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -123,7 +113,31 @@ export function initializeDatabase() {
     );
   `);
 
-  console.log('Database initialized successfully.');
+  console.log('Database tables created successfully.');
+}
+
+// 初始化資料庫
+export function initializeDatabase() {
+  try {
+    db = new Database(dbPath);
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
+  }
+
+  // 啟用 WAL 模式以提高效能
+  db.pragma('journal_mode = WAL');
+  
+  // 建立所有資料表
+  createTables(db);
+}
+
+// 模組載入時立即初始化
+try {
+  initializeDatabase();
+  console.log('Database auto-initialized on module load');
+} catch (error) {
+  console.error('Failed to auto-initialize database:', error);
 }
 
 // 插入範例題目
