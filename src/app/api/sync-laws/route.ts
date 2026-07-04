@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase, seedSampleQuizzes, getAllLaws, saveLaw, clearLaws } from '@/db';
+import { getAllLaws, saveLaw, clearLaws } from '@/db';
 
-// 法規定義 - 對應到 articles 頁面的分類
 const lawDefinitions = [
-  // 憲法類
   { id: 'DL000001', name: '中華民國憲法', category: '憲法' },
   { id: 'DL000002', name: '憲法增修條文', category: '憲法' },
   { id: 'DL000003', name: '司法院大法官憲法解釋', category: '憲法' },
-  
-  // 民事法類
   { id: 'DL000004', name: '民法', category: '民事法' },
   { id: 'DL000005', name: '民事訴訟法', category: '民事法' },
   { id: 'DL000006', name: '家事事件法', category: '民事法' },
@@ -16,14 +12,10 @@ const lawDefinitions = [
   { id: 'DL000008', name: '涉外民事法律適用法', category: '民事法' },
   { id: 'DL000009', name: '非訟事件法', category: '民事法' },
   { id: 'DL000010', name: '仲裁法', category: '民事法' },
-  
-  // 刑事法類
   { id: 'DL000012', name: '中華民國刑法', category: '刑事法' },
   { id: 'DL000013', name: '刑事訴訟法', category: '刑事法' },
   { id: 'DL000014', name: '刑事補償法', category: '刑事法' },
   { id: 'DL000015', name: '性侵害犯罪防治法', category: '刑事法' },
-  
-  // 行政法類
   { id: 'DL000016', name: '行政程序法', category: '行政法' },
   { id: 'DL000017', name: '行政訴訟法', category: '行政法' },
   { id: 'DL000018', name: '行政罰法', category: '行政法' },
@@ -31,49 +23,26 @@ const lawDefinitions = [
   { id: 'DL000020', name: '訴願法', category: '行政法' },
   { id: 'DL000021', name: '國家賠償法', category: '行政法' },
   { id: 'DL000022', name: '地方制度法', category: '行政法' },
-  
-  // 商事法類
   { id: 'DL000024', name: '公司法', category: '商事法' },
   { id: 'DL000025', name: '保險法', category: '商事法' },
   { id: 'DL000026', name: '票據法', category: '商事法' },
   { id: 'DL000027', name: '證券交易法', category: '商事法' },
   { id: 'DL000028', name: '海商法', category: '商事法' },
-  
-  // 司法制度類
   { id: 'DL000030', name: '法院組織法', category: '司法制度' },
   { id: 'DL000031', name: '法官法', category: '司法制度' },
   { id: 'DL000032', name: '律師法', category: '司法制度' },
-  
-  // 勞動與社會法類
   { id: 'DL000033', name: '勞動基準法', category: '勞動與社會法' },
   { id: 'DL000034', name: '勞工保險條例', category: '勞動與社會法' },
   { id: 'DL000035', name: '性別平等工作法', category: '勞動與社會法' },
   { id: 'DL000036', name: '消費者保護法', category: '勞動與社會法' },
-  
-  // 土地與不動產類
   { id: 'DL000037', name: '土地法', category: '土地與不動產' },
   { id: 'DL000038', name: '土地徵收條例', category: '土地與不動產' },
   { id: 'DL000039', name: '都市計畫法', category: '土地與不動產' },
-  
-  // 智慧財產類
   { id: 'DL000040', name: '著作權法', category: '智慧財產' },
   { id: 'DL000041', name: '商標法', category: '智慧財產' },
   { id: 'DL000042', name: '專利法', category: '智慧財產' },
 ];
 
-/**
- * 解析政府 API 回傳的法規內容
- * 全國法規資料庫 API 回傳格式範例：
- * {
- *   "Data": {
- *     "LawDetail": {
- *       "LName": "法規名稱",
- *       "Items": [...],  // 條文
- *       "Chapters": [...] // 章名
- *     }
- *   }
- * }
- */
 function parseLawResponse(data: any): string {
   if (!data || !data.Data) {
     return '[無法解析的回傳格式]';
@@ -82,7 +51,6 @@ function parseLawResponse(data: any): string {
   const lawDetail = data.Data.LawDetail || data.Data;
   let content = '';
   
-  // 方法1: 嘗試從 Items (條文) 取得內容
   if (lawDetail.Items && Array.isArray(lawDetail.Items)) {
     const items = lawDetail.Items.map((item: any) => {
       const itemNum = item.LName || item.ZHNM || item.No || '';
@@ -94,7 +62,6 @@ function parseLawResponse(data: any): string {
     }
   }
   
-  // 方法2: 嘗試從 Chapters (章節) 取得內容
   if (!content && lawDetail.Chapters && Array.isArray(lawDetail.Chapters)) {
     content = lawDetail.Chapters.map((ch: any) => {
       const chName = ch.ZM || ch.Name || '';
@@ -106,7 +73,6 @@ function parseLawResponse(data: any): string {
     }).join('\n\n');
   }
   
-  // 方法3: 嘗試從 LawArticle (條文列表) 取得內容
   if (!content && lawDetail.LawArticle && Array.isArray(lawDetail.LawArticle)) {
     content = lawDetail.LawArticle.map((a: any) => {
       const no = a.ZHNM || a.No || a.ItemNo || '';
@@ -115,30 +81,6 @@ function parseLawResponse(data: any): string {
     }).filter(Boolean).join('\n\n');
   }
   
-  // 方法4: 嘗試從 Data 直接取得条文
-  if (!content && data.Data && typeof data.Data === 'object') {
-    for (const key of Object.keys(data.Data)) {
-      const val = (data.Data as any)[key];
-      if (Array.isArray(val) && val.length > 0 && val[0].NR || val[0].Content) {
-        content = val.map((item: any) => 
-          `第${item.LName || item.ZHNM || item.No || ''}條 ${item.NR || item.Content || item.Text || ''}`
-        ).filter(Boolean).join('\n\n');
-        break;
-      }
-    }
-  }
-  
-  // 方法5: 嘗試從 Data.Laws 取得
-  if (!content && data.Data.Laws && Array.isArray(data.Data.Laws)) {
-    content = data.Data.Laws.map((law: any) => {
-      const articles = law.Items || law.LawArticle || [];
-      return articles.map((a: any) => 
-        `第${a.LName || a.ZHNM || a.No || ''}條 ${a.Content || a.NR || a.Text || ''}`
-      ).filter(Boolean).join('\n');
-    }).join('\n\n');
-  }
-  
-  // 如果還是沒有內容，儲存原始 JSON 的前 5000 字元
   if (!content) {
     const rawJson = JSON.stringify(lawDetail, null, 2);
     content = rawJson.length > 5000 ? rawJson.substring(0, 5000) + '...\n[內容過長，已截斷]' : rawJson;
@@ -147,117 +89,81 @@ function parseLawResponse(data: any): string {
   return content || '[暫無內容]';
 }
 
-async function fetchSingleLaw(lawDef: typeof lawDefinitions[0]): Promise<{ success: boolean; content?: string; error?: string }> {
-  try {
-    const apiUrl = `https://law.moj.gov.tw/API/${lawDef.id}`;
-    console.log(`Fetching: ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
-      signal: AbortSignal.timeout(15000), // 15秒超時
-    });
-    
-    if (!response.ok) {
-      return { success: false, error: `HTTP ${response.status}` };
-    }
-    
-    const data = await response.json();
-    const content = parseLawResponse(data);
-    
-    return { success: true, content };
-  } catch (error) {
-    return { success: false, error: String(error) };
-  }
-}
-
-async function syncLawsFromAPI(forceSync: boolean = false) {
-  const existingLaws = getAllLaws();
+export async function POST(request: Request) {
+  const { all, ids } = await request.json().catch(() => ({ all: false, ids: [] }));
   
-  // 如果不是強制同步且已有資料，跳過
-  if (!forceSync && existingLaws.length > 0) {
-    return { synced: 0, skipped: existingLaws.length, message: '已有法規資料，跳過同步。使用 forceSync=true 可強制重新同步。' };
-  }
+  let lawsToSync = [];
   
-  // 如果已有資料且強制同步，先清空
-  if (existingLaws.length > 0 && forceSync) {
-    clearLaws();
+  if (all) {
+    lawsToSync = lawDefinitions;
+  } else if (ids && Array.isArray(ids) && ids.length > 0) {
+    lawsToSync = lawDefinitions.filter(l => ids.includes(l.id));
+  } else {
+    return NextResponse.json({
+      success: false,
+      error: 'Please specify "all: true" or provide "ids" array',
+    }, { status: 400 });
   }
   
   let synced = 0;
-  let skipped = 0;
   let failed = 0;
   
-  for (const law of lawDefinitions) {
-    const result = await fetchSingleLaw(law);
-    
-    if (result.success && result.content) {
+  for (const law of lawsToSync) {
+    try {
+      const response = await fetch(`https://law.moj.gov.tw/API/${law.id}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const content = parseLawResponse(data);
+      
       saveLaw({
         id: law.id,
         name: law.name,
         category: law.category,
-        content: result.content,
+        content,
         updated_at: new Date().toISOString(),
       });
+      
       synced++;
-      console.log(`✓ Synced: ${law.name}`);
-    } else {
-      // 即使失敗也儲存基本資料
-      saveLaw({
-        id: law.id,
-        name: law.name,
-        category: law.category,
-        content: `[同步失敗: ${result.error}] 請參考官方網站: https://law.moj.gov.tw/LAW/LawMobile.aspx?ID=${law.id}`,
-        updated_at: new Date().toISOString(),
-      });
+    } catch (error) {
+      console.error(`Failed to sync ${law.name}:`, error);
       failed++;
-      console.log(`✗ Failed: ${law.name} - ${result.error}`);
     }
     
-    // 避免請求太快，加個小延遲
     await new Promise(resolve => setTimeout(resolve, 300));
   }
   
-  return { synced, skipped, failed, message: `同步完成: ${synced} 成功, ${failed} 失敗` };
-}
-
-export async function POST(request: Request) {
-  try {
-    const { force } = await request.json().catch(() => ({ force: false }));
-    
-    initializeDatabase();
-    seedSampleQuizzes();
-    
-    console.log(`Starting law synchronization (force=${force})...`);
-    const result = await syncLawsFromAPI(force);
-    console.log(result.message);
-    
-    return NextResponse.json({
-      success: true,
-      message: `Database initialized. ${result.message}`,
-      synced: result.synced,
-      skipped: result.skipped,
-      failed: result.failed,
-    });
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    return NextResponse.json(
-      { error: 'Failed to initialize database', details: String(error) },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    success: true,
+    synced,
+    failed,
+    total: lawsToSync.length,
+  });
 }
 
 export async function GET() {
-  try {
-    const laws = getAllLaws();
-    return NextResponse.json({
-      success: true,
-      lawCount: laws.length,
-      laws: laws.slice(0, 10),
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to get laws' },
-      { status: 500 }
-    );
-  }
+  const laws = getAllLaws();
+  
+  const summary = laws.map((l: any) => ({
+    id: l.id,
+    name: l.name,
+    category: l.category,
+    hasContent: l.content && l.content !== '[暫無內容]' && !l.content.startsWith('[同步失敗'),
+    updated_at: l.updated_at,
+  }));
+  
+  const withContent = summary.filter((s: any) => s.hasContent).length;
+  
+  return NextResponse.json({
+    success: true,
+    total: laws.length,
+    withContent,
+    withoutContent: laws.length - withContent,
+    laws: summary,
+  });
 }
