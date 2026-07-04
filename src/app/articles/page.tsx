@@ -91,9 +91,12 @@ export default function ArticlesPage() {
         
         if (data.success && Object.keys(data.laws).length > 0) {
           setLawsData(data.laws);
+          console.log('Loaded laws from database:', Object.keys(data.laws));
         } else {
-          // 如果還沒有法規資料，使用預定義的分類
+          // 如果還沒有法規資料，自動觸發初始化
+          console.log('No laws in database, triggering auto-init...');
           setLawsData(lawDefinitions);
+          await triggerAutoInit();
         }
       } catch (error) {
         console.error('Failed to fetch laws:', error);
@@ -106,6 +109,30 @@ export default function ArticlesPage() {
 
     fetchLaws();
   }, []);
+
+  // 自動觸發初始化
+  const triggerAutoInit = async () => {
+    try {
+      const response = await fetch('/api/init-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: false }),
+      });
+      const data = await response.json();
+      console.log('Auto-init result:', data);
+      
+      // 初始化完成後重新載入法規資料
+      if (data.success) {
+        const lawsResponse = await fetch('/api/laws');
+        const lawsData = await lawsResponse.json();
+        if (lawsData.success && Object.keys(lawsData.laws).length > 0) {
+          setLawsData(lawsData.laws);
+        }
+      }
+    } catch (error) {
+      console.error('Auto-init failed:', error);
+    }
+  };
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
