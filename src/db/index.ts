@@ -70,6 +70,18 @@ export function initializeDatabase() {
     );
   `);
 
+  // 法規資料表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS laws (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      content TEXT NOT NULL,
+      updated_at TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   console.log('Database initialized successfully.');
 }
 
@@ -417,6 +429,57 @@ export function getQuizStats(userId: string) {
 // 關閉資料庫連線
 export function closeDatabase() {
   db.close();
+}
+
+// 法規相關函數
+
+// 取得所有法規列表
+export function getAllLaws(): any[] {
+  return db.prepare(
+    `SELECT id, name, category, updated_at FROM laws ORDER BY category, name`
+  ).all() as any[];
+}
+
+// 根據 ID 取得法規內容
+export function getLawById(id: string): any {
+  return db.prepare(
+    `SELECT * FROM laws WHERE id = ?`
+  ).get(id) as any;
+}
+
+// 根據類別取得法規
+export function getLawsByCategory(category: string): any[] {
+  return db.prepare(
+    `SELECT id, name, category, updated_at FROM laws WHERE category = ? ORDER BY name`
+  ).all(category) as any[];
+}
+
+// 儲存法規
+export function saveLaw(law: {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  updated_at?: string;
+}) {
+  const existing = db.prepare('SELECT id FROM laws WHERE id = ?').get(law.id);
+  
+  if (existing) {
+    db.prepare(`
+      UPDATE laws SET name = ?, category = ?, content = ?, updated_at = ?
+      WHERE id = ?
+    `).run(law.name, law.category, law.content, law.updated_at || new Date().toISOString(), law.id);
+  } else {
+    db.prepare(`
+      INSERT INTO laws (id, name, category, content, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(law.id, law.name, law.category, law.content, law.updated_at || new Date().toISOString());
+  }
+}
+
+// 清空法規資料表
+export function clearLaws() {
+  db.exec('DELETE FROM laws');
 }
 
 // 導出資料庫實例
