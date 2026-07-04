@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { initializeDatabase, seedSampleQuizzes, getAllLaws, saveLaw, clearLaws } from '@/db';
 
+// 設定 Node.js runtime 以支援 better-sqlite3
+export const runtime = 'nodejs';
+export const maxDuration = 60; // Vercel Hobby 方案最多 60 秒
+
 // 法規定義 - 使用正確的 pcode 格式 (A 開頭)
 const lawDefinitions = [
   // 憲法類
@@ -66,49 +70,65 @@ const lawDefinitions = [
  */
 function parseLawHTML(html: string): string {
   // 提取法規名稱
-  const nameMatch = html.match(/<h2[^>]*>[^<]*<\/h2>/);
-  const lawName = nameMatch ? nameMatch[0].replace(/<[^>]+>/g, '') : '';
+  const nameMatch = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/);
+  const lawName = nameMatch ? nameMatch[1].replace(/<[^>]+>/g, '').trim() : '未知法規';
   
-  // 提取所有條文內容
-  const simpleArticleRegex = /class="law-article"[^>]*>([\s\S]*?)<\/div>/g;
+  // 提取所有條文內容 - 多種選擇器
   let articles: string[] = [];
-  let match;
   
-  while ((match = simpleArticleRegex.exec(html)) !== null) {
+  // 方法 1: 尋找 law-article 類別
+  const articleRegex = /class="law-article"[^>]*>([\s\S]*?)<\/div>/g;
+  let match;
+  while ((match = articleRegex.exec(html)) !== null) {
     let content = match[1];
-    // 移除 HTML 標籤
     content = content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
     if (content && content.length > 5) {
       articles.push(content);
     }
   }
   
-  if (articles.length > 0) {
-    return `【${lawName}】\n\n` + articles.join('\n\n');
+  // 方法 2: 如果方法 1 找不到，嘗試尋找所有條文
+  if (articles.length === 0) {
+    const articleNumRegex = /第[零一二三四五六七八九十\d]+條[^\n]*/g;
+    const matches = html.match(articleNumRegex);
+    if (matches) {
+      articles = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(m => m.length > 5);
+    }
   }
   
-  return '[無法解析內容，請參考官方網站]';
+  if (articles.length > 0) {
+    return `【${lawName}】\n\n` + articles.slice(0, 100).join('\n\n'); // 限制最多 100 條
+  }
+  
+  // 如果完全無法解析，返回基本資訊
+  return `【${lawName}】\n\n[內容無法自動解析，請前往官方網站查看]`;
 }
 
 async function fetchSingleLaw(lawDef: typeof lawDefinitions[0]): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
+    console.log(`Fetching law: ${lawDef.name} (${lawDef.id})`);
     const response = await fetch(lawDef.url, {
       headers: {
-        'User-Agent': 'LawQuizApp/1.0',
-        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'LawQuizApp/1.0 (law-quiz@vercel)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
       },
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(30000),
+      cache: 'no-store',
     });
     
     if (!response.ok) {
+      console.error(`Failed to fetch ${lawDef.name}: HTTP ${response.status}`);
       return { success: false, error: `HTTP ${response.status}` };
     }
     
     const html = await response.text();
+    console.log(`Got ${html.length} bytes from ${lawDef.name}`);
     const content = parseLawHTML(html);
     
     return { success: true, content };
   } catch (error) {
+    console.error(`Error fetching ${lawDef.name}:`, error);
     return { success: false, error: String(error) };
   }
 }
@@ -118,7 +138,7 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
   
   // 如果不是強制同步且已有資料，跳過
   if (!forceSync && existingLaws.length > 0) {
-    return { synced: 0, skipped: existingLaws.length, failed: 0, message: '已有法規資料，跳過同步。使用 force=true 可強制重新同步。' };
+    return { synced: 0, skipped: existingLaws.length, failed: 0, message: `已有 ${existingLaws.length} 筆法規資料，跳過同步。使用 force=true 可強制重新同步。` };
   }
   
   // 如果已有資料且強制同步，先清空
@@ -130,10 +150,13 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
   let skipped = 0;
   let failed = 0;
   
-  for (const law of lawDefinitions) {
+  for (let i = 0; i < lawDefinitions.length; i++) {
+    const law = lawDefinitions[i];
+    console.log(`[${i + 1}/${lawDefinitions.length}] Fetching: ${law.name}`);
+    
     const result = await fetchSingleLaw(law);
     
-    if (result.success && result.content) {
+    if (result.success && result.content && !result.content.includes('[內容無法自動解析')) {
       saveLaw({
         id: law.id,
         name: law.name,
@@ -142,14 +165,14 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
         updated_at: new Date().toISOString(),
       });
       synced++;
-      console.log(`✓ Synced: ${law.name}`);
+      console.log(`✓ Synced: ${law.name} (${synced}/${lawDefinitions.length})`);
     } else {
       // 即使失敗也儲存基本資料
       saveLaw({
         id: law.id,
         name: law.name,
         category: law.category,
-        content: `[同步失敗: ${result.error}] 請參考官方網站: ${law.url}`,
+        content: result.content || `[同步失敗: ${result.error}] 請參考官方網站: ${law.url}`,
         updated_at: new Date().toISOString(),
       });
       failed++;
@@ -157,7 +180,9 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
     }
     
     // 避免請求太快，加個小延遲
-    await new Promise(resolve => setTimeout(resolve, 500));
+    if (i < lawDefinitions.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
   }
   
   return { synced, skipped, failed, message: `同步完成: ${synced} 成功, ${failed} 失敗` };
@@ -165,26 +190,41 @@ async function syncLawsFromAPI(forceSync: boolean = false) {
 
 export async function POST(request: Request) {
   try {
-    const { force } = await request.json().catch(() => ({ force: false }));
+    console.log('POST /api/init-db called');
+    const body = await request.json().catch(() => ({}));
+    const { force } = body as { force?: boolean };
+    console.log(`Request body:`, body);
     
+    console.log('Step 1: Initializing database...');
     initializeDatabase();
+    console.log('Step 2: Seeding sample quizzes...');
     seedSampleQuizzes();
     
-    console.log(`Starting law synchronization (force=${force})...`);
-    const result = await syncLawsFromAPI(force);
+    console.log(`Step 3: Starting law synchronization (force=${force})...`);
+    const result = await syncLawsFromAPI(force || false);
     console.log(result.message);
+    
+    // 驗證最終結果
+    const finalLaws = getAllLaws();
+    console.log(`Final law count: ${finalLaws.length}`);
     
     return NextResponse.json({
       success: true,
-      message: `Database initialized. ${result.message}`,
+      message: `Database initialized. ${result.message}. Total laws: ${finalLaws.length}`,
       synced: result.synced,
       skipped: result.skipped,
       failed: result.failed,
+      totalLaws: finalLaws.length,
     });
   } catch (error) {
     console.error('Failed to initialize database:', error);
+    console.error('Error stack:', String(error));
     return NextResponse.json(
-      { error: 'Failed to initialize database', details: String(error) },
+      { 
+        error: 'Failed to initialize database', 
+        details: String(error),
+        message: '請查看伺服器日誌以取得更多詳細資訊'
+      },
       { status: 500 }
     );
   }
@@ -192,15 +232,20 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    console.log('GET /api/init-db called');
     const laws = getAllLaws();
     return NextResponse.json({
       success: true,
       lawCount: laws.length,
       laws: laws.slice(0, 10),
+      message: laws.length > 0 
+        ? `資料庫已初始化，共有 ${laws.length} 筆法規` 
+        : '資料庫尚未初始化，請發送 POST 請求進行初始化',
     });
   } catch (error) {
+    console.error('Failed to get laws:', error);
     return NextResponse.json(
-      { error: 'Failed to get laws' },
+      { error: 'Failed to get laws', details: String(error) },
       { status: 500 }
     );
   }

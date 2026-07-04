@@ -1,11 +1,52 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
-// 取得資料庫路徑
-const dbPath = path.join(process.cwd(), 'data.db');
+// 取得資料庫路徑 - 針對 Vercel standalone 部署優化
+function getDbPath(): string {
+  // 嘗試多個可能的路徑
+  const possiblePaths = [
+    path.join(process.cwd(), 'data.db'),
+    path.join(process.cwd(), '.next', 'standalone', 'data.db'),
+    path.join(process.cwd(), '.next', 'data.db'),
+    process.env.DATABASE_PATH || path.join('/tmp', 'data.db'),
+  ];
+  
+  for (const p of possiblePaths) {
+    try {
+      // 確保目錄存在
+      const dir = path.dirname(p);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      // 測試寫入
+      fs.writeFileSync(p, '');
+      return p;
+    } catch (e) {
+      console.log(`Path not writable: ${p}`, e);
+      continue;
+    }
+  }
+  
+  // 最後 fallback 到 /tmp
+  const fallbackPath = '/tmp/data.db';
+  if (!fs.existsSync('/tmp')) {
+    fs.mkdirSync('/tmp', { recursive: true });
+  }
+  return fallbackPath;
+}
+
+const dbPath = getDbPath();
+console.log('Using database path:', dbPath);
 
 // 初始化資料庫
-const db = new Database(dbPath);
+let db: any;
+try {
+  db = new Database(dbPath);
+} catch (error) {
+  console.error('Failed to initialize database:', error);
+  throw error;
+}
 
 // 啟用 WAL 模式以提高效能
 db.pragma('journal_mode = WAL');
@@ -289,7 +330,7 @@ export function seedSampleQuizzes() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertMany = db.transaction((quizzes) => {
+  const insertMany = db.transaction((quizzes: any[]) => {
     for (const quiz of quizzes) {
       insertStmt.run(
         quiz.subject,
