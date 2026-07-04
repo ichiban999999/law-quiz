@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getSubjects, initializeDatabase } from '@/db';
+import { getSubjects } from '@/lib/gas-client';
 
+// 取得所有科目列表
 export async function GET() {
   try {
-    initializeDatabase();
-    const subjects = getSubjects();
-    return NextResponse.json({ subjects });
+    const result = await getSubjects();
+    const data = result as any;
+    
+    return NextResponse.json({
+      success: true,
+      subjects: data.subjects || [],
+    });
   } catch (error) {
-    console.error('Failed to fetch subjects:', error);
+    console.error('Failed to get subjects:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch subjects' },
+      { error: 'Failed to get subjects', details: String(error) },
       { status: 500 }
     );
   }
